@@ -227,6 +227,9 @@ def add_new_post():
             db.session.add(new_post)
             db.session.commit()
             return redirect(url_for("get_all_posts"))
+        else:
+            flash('Log In To Use This Feature')
+            return redirect(url_for('login'))
     return render_template("make-post.html", form=form)
 
 
