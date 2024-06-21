@@ -13,7 +13,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 from flask_gravatar import Gravatar
-import smtplib
 from dotenv import load_dotenv
 import os
 
