@@ -1,5 +1,5 @@
 from datetime import date
-from flask import Flask, abort, render_template, redirect, url_for, flash, request
+from flask import Flask, abort, render_template, redirect, url_for, flash, request, session
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
@@ -11,10 +11,11 @@ from sqlalchemy.exc import IntegrityError
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
-from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
+from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm, ForgotPass, ForgotPassApproval, NewPassword
 from flask_gravatar import Gravatar
 from dotenv import load_dotenv
 import os
+import random
 
 
 load_dotenv()
@@ -95,6 +96,12 @@ class Comment(db.Model):
     post_comments = relationship('BlogPost', back_populates='comments')
     post_id: Mapped[int] = mapped_column(Integer, ForeignKey('blog_posts.id'))
 
+class ForgotPassLimitedTime(db.Model):
+    __tablename__ = 'limitedtimepasscode'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    limited_email = db.Column(db.String, nullable=False)
+    limited_passcode = db.Column(db.Integer, nullable=False)
+    session_id = db.Column(db.Integer)
 
 with app.app_context():
     db.create_all()
@@ -138,7 +145,8 @@ def login():
     if logged_in:
         flash('Already logged in')
         return render_template(url_for('login', logged_in=logged_in))
-    if form.validate_on_submit():
+    if form.validate_on_submit() and 'submit' in request.form:
+        print('Logged in')
         email = request.form.get('email')
         password = request.form.get('password')
         user = db.session.execute(db.select(User).where(User.email == email)).scalar()
@@ -153,6 +161,9 @@ def login():
         else:
             flash('Email Does Not Exist')
             return redirect(url_for('login'))
+    elif form.validate_on_submit() and 'forgot_password' in request.form:
+        print("gg")
+        return redirect(url_for('forgot_pass'))
     return render_template("login.html", form=form)
 
 
@@ -168,6 +179,80 @@ def get_all_posts():
     posts = result.scalars().all()
     return render_template("index.html", all_posts=posts)
 
+@app.route('/forgot_pass', methods=['POST', 'GET'])
+def forgot_pass():
+    form = ForgotPass()
+    if form.validate_on_submit():
+        id = ""
+        for _ in range(6):
+            id += str(random.randint(1, 9))
+        random_number = ""
+        for _ in range(6):
+            random_number += str(random.randint(1, 9))
+        print(random_number)
+        email = request.form.get('email')
+        try:
+            user_mail = User.query.filter_by(email=email).first().email
+            print(user_mail)
+        except:
+            flash('No Such Email!')
+            return redirect(url_for('login'))
+        else:
+            #saving content to the db
+            new_limited_time_entry = ForgotPassLimitedTime(
+                limited_passcode=random_number,
+                limited_email=user_mail,
+                session_id=id
+            )
+            db.session.add(new_limited_time_entry)
+            db.session.commit()
+            return redirect(url_for('forgot_pass_approval', emaill=user_mail))
+    return render_template('forgot_pass.html' ,form=form)
+
+@app.route('/forgot_pass/approval/<emaill>', methods=['POST', 'GET'])
+def forgot_pass_approval(emaill):
+    form = ForgotPassApproval()
+    
+    if form.validate_on_submit():
+        
+        code_entered_by_user = request.form.get('code')
+        user_data = ForgotPassLimitedTime.query.filter_by(limited_email=emaill).order_by(ForgotPassLimitedTime.id.desc()).first()
+        user_data_session_id = int(ForgotPassLimitedTime.query.filter_by(limited_email=emaill).first().session_id)
+        print(user_data)
+        print(user_data.limited_passcode)
+        print(code_entered_by_user)
+        if user_data.limited_passcode == int(code_entered_by_user):
+            print('Success')
+            return redirect(url_for('res_pass', id=user_data_session_id))
+        else:
+            flash('Code Entered Is Incorrect, Try Again')
+            return redirect(url_for('forgot_pass_approval', emaill=user_data.limited_email))
+
+        
+    return render_template('forgot_pass.html', form=form, activity='Approve')
+
+
+@app.route('/reset-password/<int:id>', methods=["POST", "GET"])
+def res_pass(id):
+    form = NewPassword()
+    if form.validate_on_submit():
+        user_data = db.session.execute(db.select(ForgotPassLimitedTime).where(ForgotPassLimitedTime.session_id == id)).scalar()
+        user_email = user_data.limited_email
+        user_data_to_update = db.session.execute(db.select(User).where(User.email == user_email)).scalar()
+        first_pass = request.form.get('new_pass')
+        second_pass = request.form.get('new_pass_again')
+        if first_pass == second_pass:
+            hashed_password = generate_password_hash(password=first_pass, method='pbkdf2:sha256', salt_length=8)
+            user_data_to_update.password = hashed_password
+            db.session.delete(user_data)
+            db.session.commit()
+            flash('Password Has been changed successfully')
+            return redirect(url_for('login'))
+
+        else:
+            flash('Passwords dont match!')
+            return redirect(url_for('res_pass', id=user_data.session_id))
+    return render_template('login.html', form=form)
 
 # TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>", methods=["GET", "POST"])
@@ -293,4 +378,4 @@ def contact():
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5002)
+    app.run(debug=True, port=5002)

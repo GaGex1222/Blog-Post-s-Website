@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, validators, PasswordField
+from wtforms import StringField, SubmitField, validators, PasswordField, IntegerField
 from wtforms.validators import DataRequired, URL, Email
 from flask_ckeditor import CKEditorField
 
@@ -25,6 +25,20 @@ class LoginForm(FlaskForm):
     email = StringField('Email', validators=[Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Log In')
+    forgot_password = SubmitField("Forgot Password?")
+
+class ForgotPassApproval(FlaskForm):
+    code = IntegerField('Code', validators=[DataRequired()])
+    submit = SubmitField('Approve')
+
+class NewPassword(FlaskForm):
+    new_pass = PasswordField("New Password", validators=[DataRequired()])
+    new_pass_again = PasswordField('Repeat Password', validators=[DataRequired()])
+    submit = SubmitField("Reset Password")
+
+class ForgotPass(FlaskForm):
+    email = StringField('Email', validators=[DataRequired()])
+    submit = SubmitField('Send Email')
 
 # TODO: Create a CommentForm so users can leave comments below posts
 class CommentForm(FlaskForm):
