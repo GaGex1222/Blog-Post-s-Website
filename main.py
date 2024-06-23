@@ -16,6 +16,7 @@ from flask_gravatar import Gravatar
 from dotenv import load_dotenv
 import os
 import random
+import smtplib
 
 
 load_dotenv()
@@ -35,6 +36,7 @@ This will install the packages from the requirements.txt for this project.
 
 secret_key = os.getenv('SECRET_KEY')
 database_url = os.getenv('DATABASE_URL')
+secret_email = os.getenv('SECRET_EMAIL')
 app = Flask(__name__)
 app.config['SECRET_KEY'] = secret_key
 ckeditor = CKEditor(app)
@@ -186,10 +188,10 @@ def forgot_pass():
         id = ""
         for _ in range(6):
             id += str(random.randint(1, 9))
-        random_number = ""
+        code = ""
         for _ in range(6):
-            random_number += str(random.randint(1, 9))
-        print(random_number)
+            code += str(random.randint(1, 9))
+        
         email = request.form.get('email')
         try:
             user_mail = User.query.filter_by(email=email).first().email
@@ -198,9 +200,18 @@ def forgot_pass():
             flash('No Such Email!')
             return redirect(url_for('login'))
         else:
+            #sending email
+            my_email = "gald12123434@gmail.com"
+            password = secret_email
+
+            connection = smtplib.SMTP("smtp.gmail.com")
+            connection.starttls()
+            connection.login(user=my_email, password=password)
+            connection.sendmail(from_addr=my_email, to_addrs=user_mail, msg=f"Subject:Code For Reset Password\n\nYour Code For Reset Password is : {code}")
+            connection.close()
             #saving content to the db
             new_limited_time_entry = ForgotPassLimitedTime(
-                limited_passcode=random_number,
+                limited_passcode=code,
                 limited_email=user_mail,
                 session_id=id
             )
