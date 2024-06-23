@@ -12,3 +12,4 @@ gunicorn==21.2.0
 psycopg2-binary==2.9.9
 email_validator==1.1.1
 python-dotenv==0.21.0
+Flask-Mail==0.9.1

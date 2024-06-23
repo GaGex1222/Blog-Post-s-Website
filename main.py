@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Integer, String, Text, ForeignKey
 from sqlalchemy.exc import IntegrityError
+from threading import Thread
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 # Import your forms from the forms.py
@@ -16,7 +17,7 @@ from flask_gravatar import Gravatar
 from dotenv import load_dotenv
 import os
 import random
-import smtplib
+from flask_mail import Mail, Message
 
 
 load_dotenv()
@@ -39,7 +40,19 @@ database_url = os.getenv('DATABASE_URL')
 secret_email = os.getenv('SECRET_EMAIL')
 app = Flask(__name__)
 app.config['SECRET_KEY'] = secret_key
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Replace with your SMTP server
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'gald12123434@gmail.com'
+app.config['MAIL_PASSWORD'] = os.getenv('SECRET_EMAIL')
+app.config['MAIL_DEFAULT_SENDER'] = ('Gal Dadon', 'gald12123434@gmail.com')
+mail = Mail(app)            
 ckeditor = CKEditor(app)
+
+def send_async_email(msg):
+    with app.app_context():
+        mail.send(msg)
+
 Bootstrap5(app)
 
 # TODO: Configure Flask-Login
@@ -201,14 +214,11 @@ def forgot_pass():
             return redirect(url_for('login'))
         else:
             #sending email
-            my_email = "gald12123434@gmail.com"
-            password = secret_email
+            msg = Message('Your Verification code for reset password in GaGex Blogs website! ', recipients=[user_mail])
+            msg.body = f'Your Verification code is: {code}'
 
-            connection = smtplib.SMTP("smtp.gmail.com")
-            connection.starttls()
-            connection.login(user=my_email, password=password)
-            connection.sendmail(from_addr=my_email, to_addrs=user_mail, msg=f"Subject:Code For Reset Password\n\nYour Code For Reset Password is : {code}")
-            connection.close()
+            thr = Thread(target=send_async_email, args=[msg])
+            thr.start()
             #saving content to the db
             new_limited_time_entry = ForgotPassLimitedTime(
                 limited_passcode=code,
